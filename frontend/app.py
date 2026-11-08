@@ -63,7 +63,7 @@ with st.sidebar:
         [
             "📊 Dashboard Penjual",
             "⚡ Uji Sentimen Real-Time",
-            "🧮 Simulasi Matematis GloVe (Bab 4)",
+            "🧮 Simulasi Matematis GloVe",
             "📁 Import CSV & Basis Data",
             "🏛️ Perancangan Sistem (DFD & ERD)"
         ],
@@ -342,27 +342,27 @@ elif menu == "⚡ Uji Sentimen Real-Time":
 # ==========================================
 # 3. SIMULASI MATEMATIS GLOVE (BAB 4 PROPOSAL)
 # ==========================================
-elif menu == "🧮 Simulasi Matematis GloVe (Bab 4)":
+elif menu == "🧮 Simulasi Matematis GloVe":
     st.title("🧮 Simulasi Perhitungan Matematis GloVe")
     st.write(
-        "Modul interaktif ini memvalidasi dan mereplikasi seluruh simulasi perhitungan manual dari **Bab 4 Proposal Riset UTS NLP**."
+        "Modul interaktif ini memvalidasi dan mereplikasi seluruh simulasi perhitungan manual."
     )
 
     tab1, tab2, tab3 = st.tabs([
-        "4.1 Matriks Kookurensi X",
-        "4.2 Fungsi Bobot, Loss, & Pembaruan SGD",
-        "4.3 Klasifikasi Sentimen Centroid (c+ vs c-)"
+        "Matriks Kookurensi X",
+        "Fungsi Bobot, Loss, & Pembaruan SGD",
+        "Klasifikasi Sentimen Centroid (c+ vs c-)"
     ])
 
     # TAB 1: Matriks Kookurensi
     with tab1:
-        st.subheader("4.1 Matriks Kookurensi X(i, j)")
+        st.subheader("Matriks Kookurensi X(i, j)")
         st.write(
             "Mencatat kemunculan bersama kata $i$ dan kata konteks $j$ dalam jendela simetris korpus."
         )
 
         st.markdown("""
-        **Korpus Tiga Ulasan (Proposal):**
+        **Korpus Tiga Ulasan:**
         - $S_1$: *“barang bagus sekali”*
         - $S_2$: *“barang jelek sekali”*
         - $S_3$: *“pengiriman cepat barang bagus”*
@@ -377,7 +377,7 @@ elif menu == "🧮 Simulasi Matematis GloVe (Bab 4)":
         custom_corpus = st.text_area(
             "Ubah Korpus Kalimat (1 kalimat per baris):",
             value="barang bagus sekali\nbarang jelek sekali\npengiriman cepat barang bagus",
-            height=100
+            height=150
         )
 
         tokenized_lines = [line.strip().split() for line in custom_corpus.strip().split("\n") if line.strip()]
@@ -388,12 +388,12 @@ elif menu == "🧮 Simulasi Matematis GloVe (Bab 4)":
         st.markdown("#### Tabel Matriks Kookurensi $X(i, j)$:")
         st.dataframe(df_X.style.background_gradient(cmap="Blues", axis=None), use_container_width=True)
 
-        if win_size == 1 and not use_dist:
-            st.success("✅ Nilai matriks di atas persis sesuai dengan **Tabel 3 Proposal UTS NLP**!")
+        # if win_size == 1 and not use_dist:
+        #     st.success("✅ Nilai matriks di atas persis sesuai dengan **Tabel 3 Proposal UTS NLP**!")
 
     # TAB 2: Bobot, Loss, SGD
     with tab2:
-        st.subheader("4.2 Fungsi Bobot, Loss GloVe, dan Pembaruan SGD (1 Iterasi)")
+        st.subheader("Fungsi Bobot, Loss GloVe, dan Pembaruan SGD (1 Iterasi)")
         st.write(
             "Minimasi fungsi loss kuadrat berbobot: "
             "$$J = \\sum_{i,j} f(X_{ij}) \\cdot (w_i \\cdot \\tilde{w}_j + b_i + \\tilde{b}_j - \\log X_{ij})^2$$"
@@ -423,7 +423,7 @@ elif menu == "🧮 Simulasi Matematis GloVe (Bab 4)":
             eta=eta_val
         )
 
-        st.markdown("#### Tabel Perhitungan Manual Langkah Demi Langkah (Tabel 4 Proposal):")
+        st.markdown("#### Tabel Perhitungan Manual Langkah Demi Langkah:")
 
         step_rows = [
             {"Langkah": "1. Data", "Rumus Matematis": "Xij dari matriks; log Xij", "Hasil Perhitungan": f"X = {step_calc['x_ij']}; log({step_calc['x_ij']}) = {step_calc['log_x']}"},
@@ -437,12 +437,12 @@ elif menu == "🧮 Simulasi Matematis GloVe (Bab 4)":
         ]
         st.table(pd.DataFrame(step_rows))
 
-        if x_val == 2.0 and xmax_val == 10.0 and alpha_val == 0.75 and eta_val == 0.1:
-            st.success("✅ Seluruh angka perhitungan langkah 1 s/d 8 di atas persis sesuai dengan **Tabel 4 Proposal UTS NLP**!")
+        # if x_val == 2.0 and xmax_val == 10.0 and alpha_val == 0.75 and eta_val == 0.1:
+        #     st.success("✅ Seluruh angka perhitungan langkah 1 s/d 8 di atas persis sesuai dengan **Tabel 4 Proposal UTS NLP**!")
 
     # TAB 3: Klasifikasi Sentimen Proposal
     with tab3:
-        st.subheader("4.3 Klasifikasi Sentimen Ulasan Baru (Tabel 5 Proposal)")
+        st.subheader("Klasifikasi Sentimen Ulasan Baru")
         st.write(
             "Menggunakan vektor kata hasil pelatihan 2D untuk menghitung rata-rata vektor ulasan $r$, "
             "lalu mengukur Cosine Similarity terhadap pusat kelas positif ($c^+$) dan negatif ($c^-$)."
@@ -455,7 +455,7 @@ elif menu == "🧮 Simulasi Matematis GloVe (Bab 4)":
         """)
 
         # Tampilkan Tabel 5
-        st.markdown("#### Tabel Hasil Klasifikasi Ulasan Baru (Tabel 5 Proposal):")
+        st.markdown("#### Tabel Hasil Klasifikasi Ulasan Baru:")
         df_t5 = pd.DataFrame(sim_prop["review_results"])
         df_t5.columns = ["Ulasan Baru", "Vektor Rata-rata r", "cos(r, c+)", "cos(r, c-)", "Prediksi"]
         st.table(df_t5)
@@ -659,20 +659,20 @@ elif menu == "📁 Import CSV & Basis Data":
 elif menu == "🏛️ Perancangan Sistem (DFD & ERD)":
     st.title("🏛️ Perancangan Sistem SentiGlove")
     st.write(
-        "Dokumentasi arsitektur sistem, aliran data (DFD), basis data relasional (ERD), dan landasan teori GloVe sesuai perancangan proposal."
+        "Dokumentasi arsitektur sistem, aliran data (DFD), basis data relasional (ERD), dan landasan teori GloVe sesuai perancangan."
     )
 
-    t_dfd, t_erd, t_theory = st.tabs(["3.1 & 3.2 DFD Level 0 & 1", "3.3 Skema ERD Basis Data", "2. Landasan Teori GloVe"])
+    t_dfd, t_erd, t_theory = st.tabs(["DFD Level 0 & 1", "Skema ERD Basis Data", "Landasan Teori GloVe"])
 
     with t_dfd:
-        st.subheader("3.1 DFD Level 0 (Diagram Konteks)")
+        st.subheader("DFD Level 0 (Diagram Konteks)")
         st.markdown("""
         Satu proses utama **0 (Sistem Analisis Sentimen Ulasan)** berinteraksi dengan dua entitas eksternal:
         - **Penjual:** Mengirimkan ulasan baru dan menerima label sentimen ulasan.
         - **Admin Data:** Memasok korpus data ulasan dan menerima laporan performa model.
         """)
 
-        st.subheader("3.2 DFD Level 1 (Dekomposisi Proses)")
+        st.subheader("DFD Level 1 (Dekomposisi Proses)")
         st.markdown("""
         Sistem dibagi menjadi 4 proses utama:
         1. **1.0 Praproses Ulasan:** Case folding, normalisasi singkatan/slang, tokenisasi, dan penghapusan stopword (mempertahankan kata sentimen & negasi).
@@ -682,17 +682,17 @@ elif menu == "🏛️ Perancangan Sistem (DFD & ERD)":
         """)
 
     with t_erd:
-        st.subheader("3.3 Skema Basis Data Relasional (ERD SentiGlove)")
+        st.subheader("Skema Basis Data Relasional (ERD SentiGlove)")
         st.markdown("""
         Terdapat 6 entitas inti relasional dalam basis data:
         1. **PENJUAL** (`id_penjual` PK, `nama_toko`)
-           - Relasi 1–N ke PRODUK.
+           - Relasi 1-N ke PRODUK.
         2. **PRODUK** (`id_produk` PK, `id_penjual` FK, `nama_produk`, `kategori`)
-           - Relasi 1–N ke ULASAN.
+           - Relasi 1-N ke ULASAN.
         3. **ULASAN** (`id_ulasan` PK, `id_produk` FK, `teks`, `rating_asli`, `label_asli`, `created_at`)
-           - Relasi 1–1 ke HASIL_SENTIMEN.
+           - Relasi 1-1 ke HASIL_SENTIMEN.
         4. **MODEL_GLOVE** (`id_model` PK, `dimensi`, `x_max`, `alpha`, `loss_akhir`, `tanggal_latih`)
-           - Relasi 1–N ke VEKTOR_KATA, KOOKURENSI, dan HASIL_SENTIMEN.
+           - Relasi 1-N ke VEKTOR_KATA, KOOKURENSI, dan HASIL_SENTIMEN.
         5. **VEKTOR_KATA** (`id` PK, `id_model` FK, `kata`, `vektor_w`, `bias_b`)
         6. **KOOKURENSI** (`id` PK, `id_model` FK, `kata_i`, `kata_j`, `jumlah`)
         7. **HASIL_SENTIMEN** (`id_hasil` PK, `id_ulasan` FK, `id_model` FK, `skor_pos`, `skor_neg`, `label_prediksi`)
