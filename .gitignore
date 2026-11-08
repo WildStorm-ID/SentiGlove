@@ -1,0 +1,24 @@
+# Ignore folder model and dataset beserta seluruh isinya
+model and dataset/
+
+# Ignore file cache model besar & binary
+*.npz
+*.pkl
+
+# Ignore file database SQLite lokal
+*.db
+sentiglove.db
+
+# Ignore environment & cache Python
+__pycache__/
+*.pyc
+.env
+.venv/
+env/
+venv/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

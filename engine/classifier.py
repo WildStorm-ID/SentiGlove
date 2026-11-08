@@ -5,17 +5,20 @@ Menerapkan:
 - Perhitungan Centroid Positif (c+) dan Centroid Negatif (c-)
 - Klasifikasi berbasis Cosine Similarity tertinggi ke c+ vs c-
 - Model pembanding / fallback: Regresi Logistik (Logistic Regression)
+- Fitur Self-Healing: Otomatis melatih dan menyimpan model jika file pkl belum ada
 """
 
 import os
 import pickle
 from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
+import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from engine.preprocessor import preprocess_review
 from engine.glove_loader import GloVeEmbedding
 
 MODEL_FILE = os.path.join("model and dataset", "senti_glove_classifier.pkl")
+CSV_PATH = os.path.join("model and dataset", "tokopedia-product-reviews-2019.csv")
 
 
 def cosine_sim(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
@@ -29,19 +32,23 @@ def cosine_sim(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
 class SentiGloveClassifier:
     _instance: Optional["SentiGloveClassifier"] = None
 
-    def __init__(self, model_path: str = MODEL_FILE):
+    def __init__(self, model_path: str = MODEL_FILE, csv_path: str = CSV_PATH):
         self.model_path = model_path
+        self.csv_path = csv_path
         self.glove = GloVeEmbedding.get_instance()
         self.c_pos: Optional[np.ndarray] = None
         self.c_neg: Optional[np.ndarray] = None
         self.logistic_model: Optional[LogisticRegression] = None
         self.is_trained = False
-        self._load_if_exists()
+        
+        # Coba muat model tersimpan; jika belum ada, inisialisasi / latih otomatis
+        if not self._load_if_exists():
+            self._auto_init()
 
     @classmethod
-    def get_instance(cls, model_path: str = MODEL_FILE) -> "SentiGloveClassifier":
+    def get_instance(cls, model_path: str = MODEL_FILE, csv_path: str = CSV_PATH) -> "SentiGloveClassifier":
         if cls._instance is None:
-            cls._instance = SentiGloveClassifier(model_path)
+            cls._instance = SentiGloveClassifier(model_path, csv_path)
         return cls._instance
 
     def _load_if_exists(self) -> bool:
@@ -55,19 +62,57 @@ class SentiGloveClassifier:
                     self.is_trained = True
                 return True
             except Exception as e:
-                print(f"Gagal memuat model tersimpan: {e}")
+                print(f"[Warning] Gagal memuat model tersimpan ({self.model_path}): {e}")
         return False
+
+    def _auto_init(self):
+        """Self-healing: Melatih model dari dataset Tokopedia atau seed kata jika model belum ada."""
+        if os.path.exists(self.csv_path):
+            try:
+                print(">>> [Auto-Init] Melatih SentiGlove Classifier dari dataset ulasan Tokopedia...")
+                df = pd.read_csv(self.csv_path)
+                df = df[df["rating"] != 3].copy()
+                df["label"] = df["rating"].apply(lambda r: "Positif" if r >= 4 else "Negatif")
+
+                df_neg = df[df["label"] == "Negatif"]
+                df_pos = df[df["label"] == "Positif"].sample(n=min(len(df_neg) * 2, 2000), random_state=42)
+                df_train = pd.concat([df_pos, df_neg]).sample(frac=1.0, random_state=42)
+
+                train_texts = df_train["text"].dropna().tolist()
+                train_labels = df_train["label"].tolist()
+                self.train_from_reviews(train_texts, train_labels)
+                print(">>> [Auto-Init] SentiGlove Classifier berhasil dilatih dan disimpan otomatis!")
+                return
+            except Exception as e:
+                print(f"[Warning] Gagal melatih otomatis dari dataset: {e}")
+
+        # Fallback: Inisialisasi centroid dari kata sentimen representatif (Proposal Bab 4.3)
+        print(">>> [Auto-Init] Menggunakan fallback sentimen berbasis kata seed representatif...")
+        pos_seeds = ["bagus", "mantap", "puas", "cepat", "rapi", "asli", "murah", "rekomendasi", "keren", "terbaik"]
+        neg_seeds = ["jelek", "rusak", "kecewa", "lambat", "pecah", "cacat", "parah", "hancur", "palsu", "kapok"]
+        
+        pos_vecs = [self.glove.get_word_vector(w)[0] for w in pos_seeds if self.glove.get_word_vector(w)[1]]
+        neg_vecs = [self.glove.get_word_vector(w)[0] for w in neg_seeds if self.glove.get_word_vector(w)[1]]
+
+        self.c_pos = np.mean(pos_vecs, axis=0).astype(np.float32)
+        self.c_neg = np.mean(neg_vecs, axis=0).astype(np.float32)
+        self.is_trained = True
+        self.save()
 
     def save(self):
         """Menyimpan model centroid dan regresi logistik ke file pkl."""
-        with open(self.model_path, "wb") as f:
-            pickle.dump({
-                "c_pos": self.c_pos,
-                "c_neg": self.c_neg,
-                "logistic_model": self.logistic_model
-            }, f)
+        try:
+            os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
+            with open(self.model_path, "wb") as f:
+                pickle.dump({
+                    "c_pos": self.c_pos,
+                    "c_neg": self.c_neg,
+                    "logistic_model": self.logistic_model
+                }, f)
+        except Exception as e:
+            print(f"[Warning] Gagal menyimpan model ke {self.model_path}: {e}")
 
-    def train_from_reviews(self, texts: List[str], labels: List[str], max_iter: int = 300):
+    def train_from_reviews(self, texts: List[str], labels: List[str], max_iter: int = 400):
         """
         Melatih pengklasifikasi dengan menghitung Centroid Positif & Negatif,
         serta melatih model fallback Logistic Regression.
@@ -103,11 +148,10 @@ class SentiGloveClassifier:
 
         # Hitung Centroid Positif (c+) dan Negatif (c-)
         # Menggunakan kombinasi titik pusat korpus dan arah diskriminan bobot w
-        # sehingga Cosine Similarity c+ vs c- selaras sempurna dengan hyperplane keputusan
+        # sehingga Cosine Similarity c+ vs c- selaras dengan hyperplane keputusan
         classes = list(self.logistic_model.classes_)
         if "Positif" in classes and "Negatif" in classes:
             pos_idx = classes.index("Positif")
-            # Jika Positif adalah kelas 1, w menunjuk ke arah Positif
             w = self.logistic_model.coef_[0] if pos_idx == 1 else -self.logistic_model.coef_[0]
             mu = np.mean(X, axis=0)
             self.c_pos = (mu + 2.0 * w).astype(np.float32)
@@ -133,7 +177,6 @@ class SentiGloveClassifier:
         label_pred = "Positif" if cos_pos >= cos_neg else "Negatif"
 
         # Hitung persentase confidence heuristik dari jarak cosine
-        # Petakan (-1 s/d 1) ke [0, 1]
         shift_pos = max(0.0, cos_pos + 1.0)
         shift_neg = max(0.0, cos_neg + 1.0)
         total_shift = shift_pos + shift_neg

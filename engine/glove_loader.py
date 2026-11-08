@@ -2,6 +2,7 @@
 Modul Pemuatan dan Representasi Word Embedding GloVe 50 Dimensi.
 Mendukung:
 - Pemuatan cepat via file binary cache .npz (1-2 detik)
+- Deteksi integritas otomatis (perlindungan pointer Git LFS & file korup)
 - Pencarian vektor kata (50d) dengan OOV fallback ke vektor nol 50d
 - Rata-rata vektor kata (Vector Averaging) untuk representasi ulasan u = (1/N) * sum(w_i)
 """
@@ -13,6 +14,21 @@ import numpy as np
 DEFAULT_NPZ_PATH = os.path.join("model and dataset", "glove_50dim.npz")
 DEFAULT_TXT_PATH = os.path.join("model and dataset", "glove_50dim_wiki.id.case.text.txt")
 DIMENSION = 50
+
+
+def is_git_lfs_pointer(filepath: str) -> bool:
+    """Memeriksa apakah berkas merupakan pointer Git LFS berukuran kecil bukannya file asli."""
+    if not os.path.exists(filepath):
+        return False
+    try:
+        if os.path.getsize(filepath) < 1024:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                header = f.read(100)
+                if "version https://git-lfs" in header:
+                    return True
+    except Exception:
+        pass
+    return False
 
 
 class GloVeEmbedding:
@@ -34,15 +50,31 @@ class GloVeEmbedding:
 
     def _load(self):
         """Memuat embedding dari .npz cache jika ada; jika tidak, dari .txt lalu menyimpannya ke .npz."""
-        if os.path.exists(self.npz_path):
-            data = np.load(self.npz_path)
-            words = data["words"]
-            vectors = data["vectors"]
-            self.embeddings = {w: vectors[i] for i, w in enumerate(words)}
-            self.is_loaded = True
-            return
+        # 1. Coba muat dari .npz
+        if os.path.exists(self.npz_path) and not is_git_lfs_pointer(self.npz_path):
+            try:
+                data = np.load(self.npz_path)
+                words = data["words"]
+                vectors = data["vectors"]
+                self.embeddings = {w: vectors[i] for i, w in enumerate(words)}
+                self.is_loaded = True
+                return
+            except Exception as e:
+                print(f"[Warning] Cache .npz rusak atau tidak valid ({e}). Akan membuat ulang dari file .txt...")
+                try:
+                    os.remove(self.npz_path)
+                except Exception:
+                    pass
 
+        # 2. Cek apakah file .txt asli ada
         if os.path.exists(self.txt_path):
+            if is_git_lfs_pointer(self.txt_path):
+                raise RuntimeError(
+                    f"File '{self.txt_path}' terdeteksi sebagai pointer Git LFS (bukan file asli ~179 MB). "
+                    f"Silakan pulihkan file asli atau jalankan 'git lfs pull'."
+                )
+
+            print(f">>> Membaca file embedding text '{self.txt_path}' (370k kata)...")
             words = []
             vectors = []
             with open(self.txt_path, "r", encoding="utf-8") as f:
@@ -51,16 +83,24 @@ class GloVeEmbedding:
                     if len(parts) == self.dimension + 1:
                         words.append(parts[0])
                         vectors.append([float(x) for x in parts[1:]])
+
             words_arr = np.array(words)
             vecs_arr = np.array(vectors, dtype=np.float32)
-            # Simpan cache .npz agar ke depannya jauh lebih cepat
-            np.savez_compressed(self.npz_path, words=words_arr, vectors=vecs_arr)
+
+            # Simpan cache .npz agar ke depannya jauh lebih cepat (< 1.5s)
+            try:
+                os.makedirs(os.path.dirname(self.npz_path), exist_ok=True)
+                np.savez_compressed(self.npz_path, words=words_arr, vectors=vecs_arr)
+                print(f">>> Binary cache '{self.npz_path}' berhasil dibuat!")
+            except Exception as e:
+                print(f"[Warning] Gagal menyimpan binary cache .npz: {e}")
+
             self.embeddings = {w: vecs_arr[i] for i, w in enumerate(words_arr)}
             self.is_loaded = True
             return
 
         raise FileNotFoundError(
-            f"Tidak menemukan file embedding di {self.npz_path} maupun {self.txt_path}"
+            f"Tidak menemukan file embedding di '{self.npz_path}' maupun '{self.txt_path}'."
         )
 
     def get_word_vector(self, word: str) -> Tuple[np.ndarray, bool]:
@@ -104,7 +144,6 @@ class GloVeEmbedding:
             else:
                 oov_words.append(token)
 
-        # Rata-rata elemen per elemen (Vector Average)
         avg_vec = np.mean(np.array(vectors, dtype=np.float32), axis=0)
 
         info = {
@@ -117,4 +156,3 @@ class GloVeEmbedding:
         }
 
         return avg_vec, info
-
